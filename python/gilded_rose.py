@@ -6,51 +6,65 @@ class GildedRose(object):
         self.items = items
 
     def update_quality(self):
+        """Handle updates for the quality of the various items."""
         for item in self.items:
-            # Handle the Conjured items first, to avoid double degradation issues
+            # Skip Sulfuras, Hand of Ragnaros since there is no change in quality or sell-in for Sulfuras.
+            if item.name == "Sulfuras, Hand of Ragnaros":
+                continue
+
+            # Handle the Conjured items first in order the to avoid double degradation issues
             if "Conjured" in item.name:
-                degrade_value = 2
-
-                if item.sell_in <= 0:
-                    degrade_value *= 2  # After sell date, degrade twice as fast
-
-                item.quality = max(0, item.quality - degrade_value)
-                item.sell_in -= 1  # Reduce the sell-in days
-                continue  # Skip rest of logic for conjured items
-
-            # Logic for other items.
-            if (
-                item.name != "Aged Brie"
-                and item.name != "Backstage passes to a TAFKAL80ETC concert"
-            ):
-                if item.quality > 0:
-                    if item.name != "Sulfuras, Hand of Ragnaros":
-                        item.quality -= 1
+                self.update_conjured(item)
             else:
-                if item.quality < 50:
-                    item.quality += 1
-                    if item.name == "Backstage passes to a TAFKAL80ETC concert":
-                        if item.sell_in < 11:
-                            if item.quality < 50:
-                                item.quality += 1
-                        if item.sell_in < 6:
-                            if item.quality < 50:
-                                item.quality += 1
+                self.update_non_conjured(item)
 
-            if item.name != "Sulfuras, Hand of Ragnaros":
-                item.sell_in -= 1
+    def update_conjured(self, item):
+        """Update the conjured item with its special degardation values."""
+        degrade_value = 2
+        if item.sell_in <= 0:
+            degrade_value *= 2  # After the sell date, degrade twice as fast
+        item.quality = max(0, item.quality - degrade_value)
+        item.sell_in -= 1  # Reduce the sell-in days
 
-            if item.sell_in < 0:
-                if item.name != "Aged Brie":
-                    if item.name != "Backstage passes to a TAFKAL80ETC concert":
-                        if item.quality > 0:
-                            if item.name != "Sulfuras, Hand of Ragnaros":
-                                item.quality -= 1
-                    else:
-                        item.quality = 0  # Backstage passes drop to 0 after concert
-                else:
-                    if item.quality < 50:
-                        item.quality += 1
+    def update_non_conjured(self, item):
+        """Update any non-conjured items."""
+        # Handle Aged Brie and Backstage passes
+        if item.name == "Aged Brie":
+            self.update_aged_brie(item)
+        elif item.name == "Backstage passes to a TAFKAL80ETC concert":
+            self.update_backstage_passes(item)
+        else:
+            self.update_normal_item(item)
+
+        # Update the sell-in value
+        item.sell_in -= 1
+
+        # Once the sell-in date has passed, degrade the quality faster.
+        if item.sell_in < 0:
+            if item.name == "Aged Brie":
+                self.update_aged_brie(item, after_sell_by=True)
+            elif item.name == "Backstage passes to a TAFKAL80ETC concert":
+                item.quality = 0  # Backstage passes drop to 0 after concert
+            else:
+                item.quality = max(0, item.quality - 1)
+
+    def update_aged_brie(self, item, after_sell_by=False):
+        if after_sell_by:
+            item.quality = min(50, item.quality + 1)
+        elif item.quality < 50:
+            item.quality += 1
+
+    def update_quantity(self, item):
+        if item.sell_in < 6:
+            item.quality = min(50, item.quality + 3)
+        elif item.sell_in < 11:
+            item.quality = min(50, item.quality + 2)
+        elif item.quality < 50:
+            item.quality += 1
+
+    def update_normal_item(self, item):
+        if item.quality > 0:
+            item.quality -= 1
 
 
 class Item:
